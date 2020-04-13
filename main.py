@@ -3,56 +3,48 @@ from datetime import datetime
 import requests
 import json
 
-delay = 1800 #seconds
-discordWebhook = 'MY_WEBHOOK' #enter in your webhook url
+delay = 1800  # seconds
+discord_webhook = 'MY_WEBHOOK'  # enter in your webhook url
+currencies_list = ['BTC', 'ETH', 'LTC', 'BCH']
 
 '''
 donate me a cup of coffee using:
-BTC: 1PxNNeap6YvuefLuDSTykGBA5Y4xHnvtxB
-ETH: 0x00B68816864d9e334FDF5f5eeb032D1DC57951D4
-LTC: LfkfCoeJL5z6fARtZJKpFfMaNqXnA5GAhy
+ETH: 0xCf99569890771d869BfC28C776D07F59b0636D72
 '''
-def getPrice(currency):
-    priceUrl = 'https://api.coinbase.com/v2/prices/{}-USD/spot'.format(currency)
-    r = requests.get(priceUrl)
-    r = json.loads(r.text)
-    return r['data']['amount']
 
-while True:
-    btc = getPrice('BTC')
-    eth = getPrice('ETH')
-    ltc = getPrice('LTC')
-    bch = getPrice('BCH')
+
+def get_price(currency: str):
+    price_url = 'https://api.coinbase.com/v2/prices/{}-USD/spot'.format(currency)
+    request = requests.get(price_url)
+    request = json.loads(request.text)
+    return request['data']['amount']
+
+
+def push_to_discord(currencies: list) -> str:
+    fields = []
+    for currency in currencies:
+        price = get_price(currency)
+        fields.append({
+            'name': currency,
+            'value': '$' + str(price),
+            'inline': True
+        })
     timestamp = datetime.utcnow().replace(microsecond=0).isoformat()
     embeds = [{
         'type': 'rich',
-        "color": 123456,
-        "timestamp": timestamp,
-        "fields": [
-          {
-            "name": "BTC:",
-            "value": '$' + str(btc),
-            "inline": True
-          },
-          {
-            "name": "ETH:",
-            "value": '$' + str(eth),
-            "inline": True
+        'color': 123456,
+        'timestamp': timestamp,
+        'fields': fields
+    }]
+    payload = {'embeds': embeds}
+    r = requests.post(discord_webhook, json=payload)
+    if r.status_code != 204:
+        print('Failed to push Webhook.\nPossible error:\n\t- Invalid Webhook')
+    return timestamp
 
-          },
-          {
-            "name": "LTC:",
-            "value": '$' + str(ltc),
-            "inline": True
-          },
-            {
-              "name": "BCH:",
-              "value": '$' + str(bch),
-              "inline": True
-            }
-          ]
-        }]
-    payload = {"embeds": embeds}
-    r = requests.post(discordWebhook,json=payload)
-    print(timestamp) #print to console to make sure program isnt frozen
-    time.sleep(delay)
+
+if __name__ == '__main__':
+    while True:
+        pushed_timestamp = push_to_discord(currencies_list)
+        print(pushed_timestamp)  # print to console to make sure program isn't frozen
+        time.sleep(delay)
